@@ -10,3 +10,11 @@ fun CurrentLocation.toMap(): CurrentLocationDto {
         longitude = longitude
     )
 }
+
+fun CurrentLocationDto.toMap(): CurrentLocation {
+    return CurrentLocation(
+        deviceId = deviceId,
+        latitude = latitude,
+        longitude = longitude
+    )
+}

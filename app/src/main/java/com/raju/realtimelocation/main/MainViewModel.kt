@@ -1,5 +1,6 @@
 package com.raju.realtimelocation.main
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.raju.realtimelocation.core.domain.util.onError
@@ -11,14 +12,23 @@ import com.raju.realtimelocation.main.presentation.MainEvent
 import com.raju.realtimelocation.main.presentation.MainState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class MainViewModel(private val mainDataSource: MainDataSource) : ViewModel() {
     private var _state = MutableStateFlow(MainState())
-    val state = _state.asStateFlow()
+    val state = _state
+        .onStart { receiveLocationUpdates() }
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            MainState()
+        )
 
     private val _events = Channel<MainEvent>()
     val events = _events.receiveAsFlow()
@@ -58,6 +68,22 @@ class MainViewModel(private val mainDataSource: MainDataSource) : ViewModel() {
                         )
                     }
                     _events.send(MainEvent.Error(error))
+                }
+        }
+    }
+
+    private fun receiveLocationUpdates() {
+        viewModelScope.launch {
+            mainDataSource.receiveLocationUpdates()
+                .catch { e ->
+                    Log.e("MainViewModel", "Error receiving location updates: ${e.message}")
+                }
+                .collect { location ->
+                    _state.update {
+                        it.copy(
+                            receivedLocation = location
+                        )
+                    }
                 }
         }
     }
